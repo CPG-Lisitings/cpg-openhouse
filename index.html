@@ -83,6 +83,7 @@
 
     .claimed-by-name { font-size: 12px; font-weight: 700; color: var(--pink); text-align: right; }
 
+    /* MODAL */
     .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(28,28,28,0.6); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
     .modal-overlay.active { display: flex; }
     .modal { background: var(--white); border-radius: 16px; padding: 28px 28px 24px; width: 100%; max-width: 380px; }
@@ -90,8 +91,45 @@
     .modal h2 { font-size: 18px; font-weight: 800; color: var(--dark); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.03em; }
     .modal-sub { font-size: 12px; color: var(--mid); font-weight: 500; margin-bottom: 22px; }
     .modal label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--mid); margin-bottom: 6px; }
-    .modal input { font-family: 'Montserrat', sans-serif; width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px; font-size: 14px; color: var(--dark); outline: none; margin-bottom: 14px; transition: border-color 0.15s; background: var(--light); }
-    .modal input:focus { border-color: var(--pink); background: var(--white); }
+
+    .modal select {
+      font-family: 'Montserrat', sans-serif;
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-size: 14px;
+      color: var(--dark);
+      outline: none;
+      margin-bottom: 14px;
+      transition: border-color 0.15s;
+      background: var(--light);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      cursor: pointer;
+    }
+    .modal select:focus { border-color: var(--pink); background-color: var(--white); }
+    .modal select option { color: var(--dark); }
+    .modal select option:first-child { color: var(--mid); }
+
+    .email-preview {
+      font-size: 12px;
+      color: var(--mid);
+      font-weight: 500;
+      margin-top: -10px;
+      margin-bottom: 14px;
+      padding: 8px 12px;
+      background: var(--light);
+      border-radius: 6px;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      transition: opacity 0.2s;
+    }
+    .email-preview.hidden { opacity: 0; }
+
     .modal-actions { display: flex; gap: 10px; margin-top: 4px; }
     .btn-cancel { font-family: 'Montserrat', sans-serif; flex: 1; padding: 11px; border: 1px solid var(--border); background: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--mid); letter-spacing: 0.05em; text-transform: uppercase; transition: all 0.15s; }
     .btn-cancel:hover { border-color: var(--dark); color: var(--dark); }
@@ -157,10 +195,11 @@
     <div class="modal-eyebrow">Claim This Slot</div>
     <h2 id="modal-title">Sign Up</h2>
     <div class="modal-sub" id="modal-sub"></div>
-    <label for="input-name">Your Name</label>
-    <input type="text" id="input-name" placeholder="First Last" autocomplete="name" />
-    <label for="input-email">Your Email</label>
-    <input type="email" id="input-email" placeholder="you@chelseaphillipsgroup.com" autocomplete="email" />
+    <label for="input-agent">Select Your Name</label>
+    <select id="input-agent">
+      <option value="" disabled selected>Choose an agent...</option>
+    </select>
+    <div class="email-preview hidden" id="email-preview"></div>
     <div class="modal-actions">
       <button class="btn-cancel" id="modal-cancel">Cancel</button>
       <button class="btn-confirm" id="modal-confirm">Claim It</button>
@@ -173,17 +212,41 @@
 <script src="config.js"></script>
 <script>
   const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
+  // ── AGENT ROSTER ─────────────────────────────────────────────
+  const AGENTS = [
+    { name: 'Ashlyn Burnsed',   email: 'ashlyn@sixbricksrealty.com' },
+    { name: 'Bella Gutgsell',   email: 'bellag@chelseaphillipsgroup.com' },
+    { name: 'Chelsea Phillips', email: 'chelseasold@gmail.com' },
+    { name: 'Cortney McGuirk', email: 'cortney@sixbricksrealty.com' },
+    { name: 'Emma Smith',       email: 'emmas@chelseaphillipsgroup.com' },
+    { name: 'Mark Douglas',     email: 'mark@sixbricksrealty.com' },
+    { name: 'Nick Witchel',     email: 'nickw@chelseaphillipsgroup.com' },
+    { name: 'Rachel Peller',    email: 'rachel@sixbricksrealty.com' },
+  ];
+
+  // Populate dropdown
+  const select = document.getElementById('input-agent');
+  AGENTS.forEach(agent => {
+    const opt = document.createElement('option');
+    opt.value = agent.email;
+    opt.textContent = agent.name;
+    opt.dataset.email = agent.email;
+    select.appendChild(opt);
+  });
+
+  // ── STATE ─────────────────────────────────────────────────────
   let currentMonth = new Date().getMonth();
-  let currentYear = new Date().getFullYear();
+  let currentYear  = new Date().getFullYear();
   let activeFilter = 'all';
-  let selectedRow = null;
-  let allListings = [];
+  let selectedRow  = null;
+  let allListings  = [];
 
   const $ = id => document.getElementById(id);
   const SCRIPT_URL = (typeof CPG_CONFIG !== 'undefined') ? CPG_CONFIG.scriptUrl : '';
 
+  // ── API ───────────────────────────────────────────────────────
   async function fetchListings(month, year) {
     if (!SCRIPT_URL) return getDemoListings(month, year);
     const res = await fetch(`${SCRIPT_URL}?action=get&month=${month + 1}&year=${year}`);
@@ -196,6 +259,7 @@
     return await res.json();
   }
 
+  // ── DEMO DATA ─────────────────────────────────────────────────
   function getDemoListings(month, year) {
     const sat1 = new Date(year, month, 1);
     while (sat1.getDay() !== 6) sat1.setDate(sat1.getDate() + 1);
@@ -203,13 +267,13 @@
     const sat3 = new Date(sat1); sat3.setDate(sat1.getDate() + 14);
     const sun1 = new Date(sat1); sun1.setDate(sat1.getDate() + 1);
     const sun2 = new Date(sat2); sun2.setDate(sat2.getDate() + 1);
-    const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const fmt  = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     return [
       { row: 2, date: fmt(sat1), address: '214 E 38th St',  time: '1:00 PM – 3:00 PM',  mlsLink: '#', agentName: '', agentEmail: '' },
       { row: 3, date: fmt(sat1), address: '603 Whitaker St', time: '12:00 PM – 2:00 PM', mlsLink: '#', agentName: '', agentEmail: '' },
-      { row: 4, date: fmt(sun1), address: '18 W Jones St',   time: '2:00 PM – 4:00 PM',  mlsLink: '#', agentName: 'Sarah Monroe', agentEmail: 'sarah@cpg.com' },
+      { row: 4, date: fmt(sun1), address: '18 W Jones St',   time: '2:00 PM – 4:00 PM',  mlsLink: '#', agentName: 'Emma Smith', agentEmail: 'emmas@chelseaphillipsgroup.com' },
       { row: 5, date: fmt(sat2), address: '47 Habersham St', time: '11:00 AM – 1:00 PM', mlsLink: '',  agentName: '', agentEmail: '' },
-      { row: 6, date: fmt(sun2), address: '512 E Bolton St', time: '1:00 PM – 3:00 PM',  mlsLink: '#', agentName: 'James Tillman', agentEmail: 'james@cpg.com' },
+      { row: 6, date: fmt(sun2), address: '512 E Bolton St', time: '1:00 PM – 3:00 PM',  mlsLink: '#', agentName: 'Nick Witchel', agentEmail: 'nickw@chelseaphillipsgroup.com' },
       { row: 7, date: fmt(sat3), address: '301 Drayton St',  time: '12:00 PM – 2:00 PM', mlsLink: '',  agentName: '', agentEmail: '' },
     ];
   }
@@ -220,6 +284,7 @@
     return { success: true };
   }
 
+  // ── RENDER ────────────────────────────────────────────────────
   function formatDate(dateStr) {
     const [y, m, d] = dateStr.split('-').map(Number);
     const dt = new Date(y, m - 1, d);
@@ -227,15 +292,15 @@
   }
 
   function updateStats() {
-    $('stat-total').textContent = allListings.length;
-    $('stat-open').textContent = allListings.filter(l => !l.agentName).length;
+    $('stat-total').textContent   = allListings.length;
+    $('stat-open').textContent    = allListings.filter(l => !l.agentName).length;
     $('stat-claimed').textContent = allListings.filter(l => l.agentName).length;
   }
 
   function renderListings() {
     updateStats();
     const filtered = activeFilter === 'all' ? allListings
-      : activeFilter === 'open' ? allListings.filter(l => !l.agentName)
+      : activeFilter === 'open'    ? allListings.filter(l => !l.agentName)
       : allListings.filter(l => l.agentName);
 
     const container = $('listings-container');
@@ -247,7 +312,7 @@
     container.innerHTML = `<div class="listings">${filtered.map(l => {
       const { dayNum, dayName } = formatDate(l.date);
       const isClaimed = !!l.agentName;
-      const mlsBtn = l.mlsLink
+      const mlsBtn    = l.mlsLink
         ? `<a class="mls-link" href="${l.mlsLink}" target="_blank" rel="noopener">View MLS</a>`
         : '';
       return `
@@ -291,14 +356,16 @@
     }
   }
 
+  // ── MODAL ─────────────────────────────────────────────────────
   function openModal(row, address, time) {
     selectedRow = row;
     $('modal-title').textContent = address;
-    $('modal-sub').textContent = time;
-    $('input-name').value = '';
-    $('input-email').value = '';
+    $('modal-sub').textContent   = time;
+    select.value = '';
+    $('email-preview').textContent = '';
+    $('email-preview').classList.add('hidden');
     $('modal').classList.add('active');
-    $('input-name').focus();
+    select.focus();
   }
 
   function closeModal() {
@@ -306,34 +373,50 @@
     selectedRow = null;
   }
 
+  // Email preview on agent select
+  select.addEventListener('change', () => {
+    const agent = AGENTS.find(a => a.email === select.value);
+    const preview = $('email-preview');
+    if (agent) {
+      preview.textContent = agent.email;
+      preview.classList.remove('hidden');
+    } else {
+      preview.textContent = '';
+      preview.classList.add('hidden');
+    }
+  });
+
   $('modal-cancel').addEventListener('click', closeModal);
   $('modal').addEventListener('click', e => { if (e.target === $('modal')) closeModal(); });
 
   $('modal-confirm').addEventListener('click', async () => {
-    const name = $('input-name').value.trim();
-    if (!name) { $('input-name').focus(); return; }
-    const email = $('input-email').value.trim();
+    const agent = AGENTS.find(a => a.email === select.value);
+    if (!agent) { select.focus(); return; }
+
     const btn = $('modal-confirm');
-    btn.disabled = true;
+    btn.disabled    = true;
     btn.textContent = 'Saving...';
+
     try {
-      await claimSlot(selectedRow, name, email);
+      await claimSlot(selectedRow, agent.name, agent.email);
       closeModal();
       await loadMonth();
       showToast();
     } catch (e) {
-      btn.disabled = false;
+      btn.disabled    = false;
       btn.textContent = 'Claim It';
       alert('Something went wrong. Please try again.');
     }
   });
 
+  // ── TOAST ─────────────────────────────────────────────────────
   function showToast() {
     const t = $('toast');
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
   }
 
+  // ── FILTERS & NAV ─────────────────────────────────────────────
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       activeFilter = btn.dataset.filter;
