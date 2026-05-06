@@ -3,18 +3,24 @@
 // Google Apps Script Backend
 // Paste this entire file into your Apps Script editor
 // ─────────────────────────────────────────────────────────────
+//
+// COLUMN STRUCTURE (update your sheet to match):
+//   A: Date
+//   B: Address
+//   C: Time
+//   D: MLS Link
+//   E: Agent Name     (auto-filled, leave blank)
+//   F: Agent Email    (auto-filled, leave blank)
+//   G: Claimed At     (auto-filled, leave blank)
+//
+// ─────────────────────────────────────────────────────────────
 
 const SHEET_NAME = 'Open Houses';
 
 function doGet(e) {
   const action = e.parameter.action;
-
-  if (action === 'get') {
-    return getListings(e);
-  } else if (action === 'claim') {
-    return claimSlot(e);
-  }
-
+  if (action === 'get')   return getListings(e);
+  if (action === 'claim') return claimSlot(e);
   return jsonResponse({ error: 'Unknown action' });
 }
 
@@ -24,10 +30,8 @@ function getListings(e) {
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
   const data  = sheet.getDataRange().getValues();
-
   const results = [];
 
-  // Row 0 is headers, start at row 1
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     const dateVal = row[0];
@@ -36,14 +40,13 @@ function getListings(e) {
     const date = new Date(dateVal);
     if (date.getMonth() + 1 === month && date.getFullYear() === year) {
       results.push({
-        row:         i + 1,                                        // 1-indexed sheet row
-        date:        Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
-        address:     row[1] || '',
-        neighborhood:row[2] || '',
-        time:        row[3] || '',
-        price:       row[4] || '',
-        agentName:   row[5] || '',
-        agentEmail:  row[6] || ''
+        row:        i + 1,
+        date:       Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+        address:    row[1] || '',
+        time:       row[2] || '',
+        mlsLink:    row[3] || '',
+        agentName:  row[4] || '',
+        agentEmail: row[5] || ''
       });
     }
   }
@@ -52,21 +55,20 @@ function getListings(e) {
 }
 
 function claimSlot(e) {
-  const rowIndex  = parseInt(e.parameter.row);
-  const agentName = e.parameter.name  || '';
-  const agentEmail= e.parameter.email || '';
+  const rowIndex   = parseInt(e.parameter.row);
+  const agentName  = e.parameter.name  || '';
+  const agentEmail = e.parameter.email || '';
 
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const currentName = sheet.getRange(rowIndex, 6).getValue();
+  const currentName = sheet.getRange(rowIndex, 5).getValue();
 
-  // Prevent overwriting an already-claimed slot
   if (currentName && currentName.toString().trim() !== '') {
     return jsonResponse({ success: false, reason: 'already_claimed' });
   }
 
-  sheet.getRange(rowIndex, 6).setValue(agentName);
-  sheet.getRange(rowIndex, 7).setValue(agentEmail);
-  sheet.getRange(rowIndex, 8).setValue(new Date()); // timestamp
+  sheet.getRange(rowIndex, 5).setValue(agentName);
+  sheet.getRange(rowIndex, 6).setValue(agentEmail);
+  sheet.getRange(rowIndex, 7).setValue(new Date());
 
   return jsonResponse({ success: true });
 }
